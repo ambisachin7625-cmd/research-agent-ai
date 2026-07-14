@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+{% block title %}{{ data.question }} — ResearchAI{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Results-page overrides ── */
+.rp-header {
+    margin-bottom: 2rem;
+}
+.rp-question {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(16,185,129,0.06));
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+.rp-question-icon { font-size: 1.25rem; margin-top: 2px; flex-shrink: 0; }
+.rp-question-text {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #A5B4FC;
+    line-height: 1.5;
+}
+.rp-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+.rp-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-size: 0.875rem;
+}
+.rp-stat-num { font-weight: 700; color: var(--accent-indigo); font-size: 1rem; }
+.rp-stat-label { color: var(--text-secondary); }
+.export-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+.export-strip a {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    transition: all 0.18s;
+}
+.export-strip a:hover {
+    border-color: rgba(99,102,241,0.5);
+    color: var(--accent-indigo);
+    background: rgba(99,102,241,0.08);
+}
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0;
+}
+.tab-btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.18s;
+    border-radius: 6px 6px 0 0;
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active {
+    color: var(--accent-indigo);
+    border-bottom-color: var(--accent-indigo);
+    background: rgba(99,102,241,0.06);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+/* Report */
+.report-card { border-left: 3px solid var(--accent-indigo); }
+.report-inner {
+    background: #fff;
+    color: #111827;
+    padding: 2rem;
+    border-radius: 8px;
+    line-height: 1.85;
+    font-size: 0.97rem;
+}
+.report-inner h1,.report-inner h2,.report-inner h3 {
+    margin: 1.25em 0 0.5em;
+    font-weight: 700;
+    color: #1e1e2e;
+}
+.report-inner p { margin-bottom: 1em; }
+.report-inner ul,.report-inner ol { padding-left: 1.5em; margin-bottom: 1em; }
+.report-inner li { margin-bottom: 0.4em; }
+.report-inner a { color: #4F46E5; text-decoration: underline; }
+.report-inner a:hover { color: #6366F1; }
+/* Source cards */
+.source-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.src-card {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    transition: all 0.18s;
+    position: relative;
+}
+.src-card:hover {
+    border-color: rgba(99,102,241,0.35);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    transform: translateY(-1px);
+}
+.src-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.src-num {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    background: rgba(99,102,241,0.15);
+    color: var(--accent-indigo);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.src-favicon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+.src-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    flex: 1;
+    line-height: 1.4;
+}
+.src-quality-badge {
+    flex-shrink: 0;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(16,185,129,0.12);
+    color: #10B981;
+    border: 1px solid rgba(16,185,129,0.25);
+}
+.src-snippet {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 0.65rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.src-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.src-url-link {
+    font-size: 0.78rem;
+    color: var(--accent-indigo);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+.src-url-link:hover { text-decoration: underline; color: #818CF8; }
+.src-open-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.75rem;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 6px;
+    color: var(--accent-indigo);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+.src-open-btn:hover {
+    background: rgba(99,102,241,0.2);
+    color: #fff;
+}
+/* Action panel */
+.action-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+.action-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    flex: 1;
+    min-width: 260px;
+}
+.action-box h3 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-secondary);
+    margin-bottom: 0.65rem;
+}
+.followup-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.65rem;
+}
+.followup-chip {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    padding: 0.4rem 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.followup-chip:hover {
+    border-color: rgba(99,102,241,0.4);
+    color: var(--accent-indigo);
+    background: rgba(99,102,241,0.06);
+}
+.followup-input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+.followup-input-row input {
+    flex: 1;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+}
+.followup-input-row input:focus {
+    outline: none;
+    border-color: var(--accent-indigo);
+}
+.btn-sm {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent-indigo);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.btn-sm:hover { background: #4F46E5; }
+.btn-edit {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(99,102,241,0.4);
+    border-radius: 6px;
+    background: rgba(99,102,241,0.08);
+    color: var(--accent-indigo);
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+}
+.btn-edit:hover { background: rgba(99,102,241,0.18); }
+/* Memory & highlights */
+.mem-card {
+    background: var(--bg-dark);
+    border: 1px solid rgba(16,185,129,0.15);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+.mem-card a { color: var(--accent-indigo); font-size: 0.78rem; text-decoration: none; }
+.mem-card a:hover { text-decoration: underline; }
+.highlight-pill {
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+}
+.modal-box {
+    background: var(--bg-card);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 14px;
+    padding: 1.5rem;
+    width: 95%;
+    max-width: 580px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+}
+.modal-box h3 { font-size: 1.05rem; margin-bottom: 1rem; font-weight: 600; }
+.modal-box label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.3rem; }
+.modal-box textarea, .modal-box .modal-input {
+    width: 100%;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.85rem;
+    font-family: inherit;
+}
+.modal-box textarea { min-height: 90px; resize: vertical; }
+.modal-box textarea:focus, .modal-box .modal-input:focus {
+    outline: none;
+    border-color: var(--accent-indigo);
+}
+.modal-actions { display: flex; gap: 0.65rem; justify-content: flex-end; }
+.btn-cancel {
+    padding: 0.55rem 1rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-cancel:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+/* Card reuse */
+.rp-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+}
+.rp-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.rp-card-body { padding: 1.1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="results-main">
+
+    <!-- Question header -->
+    <div class="rp-header">
+        <div class="rp-question">
+            <span class="rp-question-icon">🔬</span>
+            <span class="rp-question-text" id="display-question">{{ data.question }}</span>
+        </div>
+
+        <!-- Compact stats -->
+        <div class="rp-stats">
+            <div class="rp-stat">
+                <span>🔄</span>
+                <span class="rp-stat-num">{{ data.iterations }}</span>
+                <span class="rp-stat-label">iterations</span>
+            </div>
+            <div class="rp-stat">
+                <span>🌐</span>
+                <span class="rp-stat-num">{{ data.sources_count }}</span>
+                <span class="rp-stat-label">sources</span>
+            </div>
+            <div class="rp-stat">
+                <span>🧠</span>
+                <span class="rp-stat-num">{{ data.facts_count }}</span>
+                <span class="rp-stat-label">facts</span>
+            </div>
+        </div>
+
+        <!-- Export bar -->
+        <div class="export-strip">
+            <a href="{{ url_for('export_report', export_format='markdown', session_id=data.session_id) }}">⬇ Markdown</a>
+            <a href="{{ url_for('export_report', export_format='docx', session_id=data.session_id) }}">⬇ Word</a>
+            <a href="{{ url_for('export_report', export_format='pdf', session_id=data.session_id) }}">⬇ PDF</a>
+            <a href="{{ url_for('export_report', export_format='txt', session_id=data.session_id) }}">⬇ Text</a>
+        </div>
+    </div>
+
+    <!-- Action row: Edit + Continue -->
+    <div class="action-row">
+        <div class="action-box" style="max-width:200px;">
+            <h3>Edit Question</h3>
+            <button class="btn-edit" id="open-edit-modal">✏️ Edit &amp; Re-research</button>
+        </div>
+        <div class="action-box">
+            <h3>Continue Research</h3>
+            <div class="followup-chips">
+                {% for suggestion in data.follow_up_suggestions %}
+                <form action="{{ url_for('research') }}" method="POST" onsubmit="showLoading()">
+                    <input type="hidden" name="action" value="continue">
+                    <input type="hidden" name="session_id" value="{{ data.session_id }}">
+                    <input type="hidden" name="follow_up_prompt" value="{{ suggestion }}">
+                    <button type="submit" class="followup-chip">{{ suggestion }}</button>
+                </form>
+                {% endfor %}
+            </div>
+            <form action="{{ url_for('research') }}" method="POST" onsubmit="showLoading()">
+                <input type="hidden" name="action" value="continue">
+                <input type="hidden" name="session_id" value="{{ data.session_id }}">
+                <div class="followup-input-row">
+                    <input type="text" name="follow_up_prompt" placeholder="Ask a follow-up..." required>
+                    <button type="submit" class="btn-sm">Go →</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-report">📄 Report</button>
+        <button class="tab-btn" data-tab="tab-sources">🔗 Sources ({{ data.source_details | length }})</button>
+        <button class="tab-btn" data-tab="tab-highlights">✨ Highlights</button>
+        <button class="tab-btn" data-tab="tab-memory">🧠 Memory</button>
+    </div>
+
+    <!-- Tab: Report -->
+    <div class="tab-panel active" id="tab-report">
+        <div class="rp-card report-card">
+            <div class="rp-card-header">
+                <span>Research Report</span>
+                <button class="btn-sm" onclick="copyReport()">Copy</button>
+            </div>
+            <div class="rp-card-body">
+                <div class="report-inner" id="reportText">{{ data.report_html | safe }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Sources -->
+    <div class="tab-panel" id="tab-sources">
+        <div class="rp-card">
+            <div class="rp-card-header">
+                <span>🔗 Sources Used</span>
+                <span style="font-size:0.8rem;color:var(--text-secondary)">{{ data.source_details | length }} sources found</span>
+            </div>
+            <div class="rp-card-body">
+                <div class="source-list">
+                {% for source in data.source_details %}
+                <div class="src-card">
+                    <div class="src-top">
+                        <div class="src-num">{{ loop.index }}</div>
+                        <img class="src-favicon"
+                             src="https://www.google.com/s2/favicons?domain={{ source.url }}&sz=32"
+                             onerror="this.style.display='none'" alt="">
+                        <span class="src-title">{{ source.title or source.url }}</span>
+                        <span class="src-quality-badge">{{ source.quality }} • {{ source.score }}/10</span>
+                    </div>
+                    {% if source.snippet %}
+                    <div class="src-snippet">{{ source.snippet }}</div>
+                    {% endif %}
+                    <div class="src-footer">
+                        <a class="src-url-link" href="{{ source.url }}" target="_blank" rel="noopener noreferrer"
+                           title="{{ source.url }}">{{ source.url }}</a>
+                        <a class="src-open-btn" href="{{ source.url }}" target="_blank" rel="noopener noreferrer">
+                            ↗ Open
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <p style="color:var(--text-secondary);font-size:0.875rem;">No sources found.</p>
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Highlights -->
+    <div class="tab-panel" id="tab-highlights">
+        <div class="rp-card">
+            <div class="rp-card-header"><span>✨ Key Highlights</span></div>
+            <div class="rp-card-body">
+                {% if data.highlights %}
+                    {% for h in data.highlights %}
+                    <div class="highlight-pill">{{ h }}</div>
+                    {% endfor %}
+                {% else %}
+                    <p style="color:var(--text-secondary);font-size:0.875rem;">No highlights extracted.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Memory -->
+    <div class="tab-panel" id="tab-memory">
+        <div class="rp-card">
+            <div class="rp-card-header"><span>🧠 Relevant Memory Snippets</span></div>
+            <div class="rp-card-body">
+                {% if data.memory_snippets %}
+                    {% for s in data.memory_snippets %}
+                    <div class="mem-card">
+                        <p>{{ s.text[:350] }}{% if s.text | length > 350 %}…{% endif %}</p>
+                        <a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">↗ {{ s.url }}</a>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="color:var(--text-secondary);font-size:0.875rem;">No memory snippets.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- Edit modal -->
+<div id="edit-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>✏️ Edit Research Question</h3>
+        <form id="reresearch-form" action="{{ url_for('reresearch') }}" method="POST" onsubmit="showLoading()">
+            <input type="hidden" name="session_id" value="{{ data.session_id }}">
+            <label for="edit-question">Question</label>
+            <textarea id="edit-question" name="edited_question">{{ data.question }}</textarea>
+            <label for="focus-text">Focus area (optional)</label>
+            <input id="focus-text" name="focus_text" class="modal-input" placeholder="e.g. focus on salary in India only">
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" id="cancel-edit">Cancel</button>
+                <button type="submit" class="btn-sm">Re-research →</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyReport() {
+    const text = document.getElementById('reportText').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('.report-card .btn-sm');
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+}
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === btn.dataset.tab));
+    });
+});
+
+// Edit modal
+document.getElementById('open-edit-modal').addEventListener('click', () => {
+    document.getElementById('edit-modal').style.display = 'flex';
+});
+document.getElementById('cancel-edit').addEventListener('click', () => {
+    document.getElementById('edit-modal').style.display = 'none';
+});
+// Close modal on backdrop click
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+
+// Fix: update displayed question to reflect what was actually researched
+// If the page was loaded from a re-research, the textarea contains the edited question.
+// The data.question already reflects the current session question from Python.
+// No extra JS needed — data.question is already correct after re-research.
+</script>
+{% endblock %}
