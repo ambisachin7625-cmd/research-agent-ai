@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: researchai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: llama-3.1-8b-instant
+      - key: OPENAI_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FAST_RESEARCH
+        value: "true"
+      - key: DATABASE_PATH
+        value: /tmp/researchai.db
