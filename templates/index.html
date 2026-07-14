@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}ResearchAI - AI-Powered Research{% endblock %}
+
+{% block content %}
+<main class="chat-main">
+    <section class="hero compact-hero">
+        <div class="hero-badge badge">✨ AI-Powered Research Agent</div>
+        <h1 class="hero-title">What would you like to research?</h1>
+        <p class="hero-subtitle">
+            Enter any topic. Our AI searches the web, extracts facts, and delivers a cited report.
+        </p>
+
+        <form action="{{ url_for('research') }}" method="POST" class="search-form" onsubmit="showLoading()">
+            <input type="text" name="question" class="search-input"
+                   placeholder="e.g. How does quantum computing threaten encryption?" required autocomplete="off">
+            <button type="submit" class="btn-primary">Start Research →</button>
+        </form>
+
+        <div class="feature-pills">
+            <div class="feature-pill">🔍 Fast Web Search</div>
+            <div class="feature-pill">🧠 Reflection Agent</div>
+            <div class="feature-pill">📊 Citations</div>
+            <div class="feature-pill">💾 Saved History</div>
+        </div>
+    </section>
+</main>
+{% endblock %}

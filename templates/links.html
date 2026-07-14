@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Live Project Links - ResearchAI{% endblock %}
+
+{% block content %}
+<main class="chat-main">
+    <section class="hero compact-hero">
+        <div class="hero-badge badge">🔗 Live Link Fetcher</div>
+        <h1 class="hero-title">Find live project links</h1>
+        <p class="hero-subtitle">
+            Search any topic and get verified live URLs with titles, snippets, and source quality scores.
+        </p>
+
+        <form id="links-form" class="search-form" onsubmit="return fetchLinks(event)">
+            <input type="text" id="query-input" class="search-input"
+                   placeholder="e.g. open source AI agent projects github" required autocomplete="off">
+            <button type="submit" class="btn-primary" id="fetch-btn">Fetch Links →</button>
+        </form>
+
+        <div class="links-options">
+            <label class="links-option">
+                <span>Max results</span>
+                <select id="max-results">
+                    <option value="3">3</option>
+                    <option value="5" selected>5</option>
+                    <option value="10">10</option>
+                </select>
+            </label>
+            <label class="links-option">
+                <input type="checkbox" id="validate-live" checked>
+                <span>Validate URLs are live</span>
+            </label>
+        </div>
+    </section>
+
+    <section id="links-status" class="links-status" hidden></section>
+    <section id="links-results" class="links-results"></section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function fetchLinks(event) {
+        event.preventDefault();
+
+        const query = document.getElementById('query-input').value.trim();
+        const maxResults = document.getElementById('max-results').value;
+        const validate = document.getElementById('validate-live').checked;
+        const statusEl = document.getElementById('links-status');
+        const resultsEl = document.getElementById('links-results');
+        const btn = document.getElementById('fetch-btn');
+
+        if (!query) return false;
+
+        btn.disabled = true;
+        btn.textContent = 'Fetching...';
+        statusEl.hidden = false;
+        statusEl.className = 'links-status loading';
+        statusEl.textContent = 'Searching the web and validating links...';
+        resultsEl.innerHTML = '';
+
+        try {
+            const params = new URLSearchParams({
+                q: query,
+                max: maxResults,
+                validate: validate ? 'true' : 'false',
+            });
+            const response = await fetch(`/api/links?${params}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Request failed');
+            }
+
+            statusEl.className = 'links-status success';
+            statusEl.textContent = `Found ${data.count} link${data.count === 1 ? '' : 's'} for "${data.query}"`;
+            resultsEl.innerHTML = renderLinks(data.links);
+        } catch (err) {
+            statusEl.className = 'links-status error';
+            statusEl.textContent = err.message || 'Failed to fetch links';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Fetch Links →';
+        }
+
+        return false;
+    }
+
+    function renderLinks(links) {
+        if (!links.length) {
+            return '<p class="links-empty">No links found. Try a different search query.</p>';
+        }
+
+        return links.map((link, index) => {
+            const liveBadge = link.live === true
+                ? '<span class="link-badge live">Live</span>'
+                : link.live === false
+                    ? '<span class="link-badge dead">Unreachable</span>'
+                    : '';
+
+            return `
+                <article class="link-card">
+                    <div class="link-card-header">
+                        <span class="link-index">${index + 1}</span>
+                        <h3 class="link-title">
+                            <a href="${link.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.title)}</a>
+                        </h3>
+                        ${liveBadge}
+                    </div>
+                    <p class="link-domain">${escapeHtml(link.domain)} · ${escapeHtml(link.quality)} (score ${link.score})</p>
+                    <p class="link-snippet">${escapeHtml(link.snippet)}</p>
+                    <a class="link-url" href="${link.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.url)}</a>
+                </article>
+            `;
+        }).join('');
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

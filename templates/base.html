@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ResearchAI{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+{% if current_user.is_authenticated %}
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="{{ url_for('index') }}" class="logo sidebar-logo">
+                <span class="text-emerald">🌿</span>
+                <span class="text-indigo">ResearchAI</span>
+            </a>
+            <a href="{{ url_for('index') }}" class="btn-new-chat">+ New Chat</a>
+            <a href="{{ url_for('links_page') }}" class="btn-links">🔗 Live Links</a>
+        </div>
+
+        <div class="sidebar-history">
+            <div class="sidebar-section-label">History</div>
+            {% if chat_history %}
+                {% for chat in chat_history %}
+                <a href="{{ url_for('view_history', history_id=chat.id) }}"
+                   class="history-item-link {% if active_history_id == chat.id %}active{% endif %}"
+                   title="{{ chat.question }}">
+                    <span class="history-item-title">{{ chat.title }}</span>
+                    <span class="history-item-date">{{ chat.updated_at[:10] }}</span>
+                </a>
+                {% endfor %}
+            {% else %}
+                <p class="sidebar-empty">No research yet. Start a new chat!</p>
+            {% endif %}
+        </div>
+
+        <div class="sidebar-footer">
+            <span class="sidebar-user">{{ current_user.username }}</span>
+            <a href="{{ url_for('logout') }}" class="sidebar-logout">Logout</a>
+        </div>
+    </aside>
+
+    <div class="main-panel">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</div>
+{% else %}
+    {% block auth_content %}{% endblock %}
+{% endif %}
+
+<div id="loading-overlay" style="display: none;">
+    <div class="spinner-ring"></div>
+    <div class="loading-steps">
+        <span>Searching the web...</span>
+        <span>Extracting facts...</span>
+        <span>Writing your report...</span>
+    </div>
+    <p class="loading-subtext">Fast mode enabled — usually 20-40 seconds.</p>
+</div>
+
+<script>
+    function showLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'flex';
+    }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
