@@ -258,7 +258,16 @@ def api_fetch_links():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "service": "ResearchAI"})
+    llm_ok = bool(Config.OPENAI_API_KEY and not str(Config.OPENAI_API_KEY).startswith("your-"))
+    tavily_ok = bool(Config.TAVILY_API_KEY and not str(Config.TAVILY_API_KEY).startswith("your-"))
+    return jsonify({
+        "status": "ok" if (llm_ok and tavily_ok) else "degraded",
+        "service": "ResearchAI",
+        "llm_configured": llm_ok,
+        "tavily_configured": tavily_ok,
+        "llm_provider": "groq" if Config.OPENAI_BASE_URL and "groq" in Config.OPENAI_BASE_URL else "openai",
+        "model": Config.OPENAI_MODEL,
+    })
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -363,6 +372,9 @@ def research():
 
     results_data = _enrich_results(results_data)
 
+    if results_data.get("error"):
+        flash(results_data.get("error_message", "Research failed. Check your API keys on Render."), "error")
+
     if results_data.get("session_id") and results_data.get("question"):
         save_chat_history(
             current_user.id,
@@ -389,6 +401,9 @@ def reresearch():
 
     results_data = continue_research(session_id, edited_question=edited_question)
     results_data = _enrich_results(results_data)
+
+    if results_data.get("error"):
+        flash(results_data.get("error_message", "Research failed. Check your API keys on Render."), "error")
 
     if results_data.get("session_id"):
         save_chat_history(

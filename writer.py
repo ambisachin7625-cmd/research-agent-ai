@@ -35,28 +35,33 @@ class ReportWriter:
 
     def _extract_json_array(self, content: str, instructions: str) -> List[str]:
         """Extracts a JSON array of strings from the model given a content block."""
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a structured data extraction assistant."},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"{instructions}\n\nContent:\n{content}\n\n"
-                            "Return ONLY a JSON array of strings."
-                        )
-                    }
-                ],
-                response_format={"type": "json_array"},
-                temperature=0.2
-            )
-            raw = response.choices[0].message.content
-            parsed = json.loads(self._clean_json_response(raw))
-            if isinstance(parsed, list):
-                return [str(item).strip() for item in parsed if str(item).strip()]
-        except Exception:
-            pass
+        user_msg = (
+            f"{instructions}\n\nContent:\n{content}\n\n"
+            "Return ONLY a JSON object with an \"items\" key containing an array of strings."
+        )
+        for response_format in ({"type": "json_object"}, None):
+            try:
+                kwargs = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": "You are a structured data extraction assistant."},
+                        {"role": "user", "content": user_msg},
+                    ],
+                    "temperature": 0.2,
+                }
+                if response_format:
+                    kwargs["response_format"] = response_format
+                response = self.client.chat.completions.create(**kwargs)
+                raw = response.choices[0].message.content
+                parsed = json.loads(self._clean_json_response(raw))
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+                if isinstance(parsed, dict):
+                    for key in ("items", "highlights", "facts", "results"):
+                        if key in parsed and isinstance(parsed[key], list):
+                            return [str(item).strip() for item in parsed[key] if str(item).strip()]
+            except Exception:
+                continue
         return []
 
     def write_report(self, question: str, facts: List[Dict[str, Any]]) -> Dict[str, Any]:

@@ -330,6 +330,69 @@ def get_session(session_id: str) -> Any:
     return SESSION_STORE.get(session_id)
 
 
+def _friendly_error(exc: Exception) -> str:
+    """Turn low-level API errors into actionable messages for the UI."""
+    msg = str(exc)
+    lower = msg.lower()
+    if "invalid_api_key" in lower or "invalid api key" in lower or "401" in msg:
+        provider = "Groq" if Config.OPENAI_BASE_URL and "groq" in Config.OPENAI_BASE_URL else "LLM"
+        return (
+            f"The {provider} API key is invalid or expired. "
+            f"Update OPENAI_API_KEY in your Render environment variables "
+            f"({provider} key from console.groq.com if using Groq)."
+        )
+    if "tavily" in lower:
+        return "Tavily search failed. Check that TAVILY_API_KEY is set correctly in Render."
+    if "missing configuration" in lower:
+        return msg
+    return f"Research failed: {msg}"
+
+
+def _error_result(
+    session: ResearchSession,
+    question: str,
+    logs: List[str],
+    exc: Exception,
+    *,
+    preserve_session: bool = False,
+) -> Dict[str, Any]:
+    error_message = _friendly_error(exc)
+    logs.append(f"[!] Critical Error: {error_message}")
+    logs.append(traceback.format_exc())
+
+    base = {
+        "session_id": session.session_id,
+        "question": question,
+        "error": True,
+        "error_message": error_message,
+        "log": logs,
+        "sources": [source["url"] for source in session.source_details] if preserve_session else [],
+        "source_details": session.source_details if preserve_session else [],
+        "facts": [],
+        "iteration_history": session.iteration_history if preserve_session else [],
+        "graph_data": {
+            "question": {"id": "question", "text": question},
+            "queries": [],
+            "sources": session.source_details if preserve_session else [],
+            "facts": [],
+            "report": {"id": "report", "text": "Final Research Report"},
+            "edges": []
+        },
+        "iterations": len(session.iteration_history) if preserve_session else 0,
+        "facts_count": len(session.memory_snippets) if preserve_session else 0,
+        "sources_count": len(session.sources) if preserve_session else 0,
+        "report": error_message if not preserve_session else session.report_payload.get("report", error_message),
+        "highlights": session.report_payload.get("highlights", []) if preserve_session else [],
+        "important_facts": session.report_payload.get("important_facts", []) if preserve_session else [],
+        "citation_map": session.report_payload.get("citation_map", {}) if preserve_session else {},
+        "citations": session.report_payload.get("references", []) if preserve_session else [],
+        "follow_up_suggestions": session.follow_up_suggestions if preserve_session else [],
+        "images": session.image_results if preserve_session else [],
+        "memory_snippets": session.memory_snippets if preserve_session else [],
+    }
+    return base
+
+
 def start_research(question: str) -> Dict[str, Any]:
     logs: List[str] = []
     session = ResearchSession(question)
@@ -350,35 +413,7 @@ def start_research(question: str) -> Dict[str, Any]:
 
         return _build_result(session, logs)
     except Exception as e:
-        logs.append(f"[!] Critical Error: {str(e)}")
-        logs.append(traceback.format_exc())
-        return {
-            "question": question,
-            "log": logs,
-            "sources": [],
-            "source_details": [],
-            "facts": [],
-            "iteration_history": [],
-            "graph_data": {
-                "question": {"id": "question", "text": question},
-                "queries": [],
-                "sources": [],
-                "facts": [],
-                "report": {"id": "report", "text": "Final Research Report"},
-                "edges": []
-            },
-            "iterations": 0,
-            "facts_count": 0,
-            "sources_count": 0,
-            "report": "An error occurred during the research process. Please check the logs.",
-            "highlights": [],
-            "important_facts": [],
-            "citation_map": {},
-            "citations": [],
-            "follow_up_suggestions": [],
-            "images": [],
-            "memory_snippets": []
-        }
+        return _error_result(session, question, logs, e)
 
 
 def continue_research(session_id: str, follow_up_prompt: str = None, edited_question: str = None) -> Dict[str, Any]:
@@ -413,35 +448,7 @@ def continue_research(session_id: str, follow_up_prompt: str = None, edited_ques
 
         return _build_result(session, logs)
     except Exception as e:
-        logs.append(f"[!] Critical Error: {str(e)}")
-        logs.append(traceback.format_exc())
-        return {
-            "question": session.current_question,
-            "log": logs,
-            "sources": [source["url"] for source in session.source_details],
-            "source_details": session.source_details,
-            "facts": [],
-            "iteration_history": session.iteration_history,
-            "graph_data": {
-                "question": {"id": "question", "text": session.current_question},
-                "queries": [],
-                "sources": session.source_details,
-                "facts": [],
-                "report": {"id": "report", "text": "Final Research Report"},
-                "edges": []
-            },
-            "iterations": len(session.iteration_history),
-            "facts_count": len(session.memory_snippets),
-            "sources_count": len(session.sources),
-            "report": session.report_payload.get("report", ""),
-            "highlights": session.report_payload.get("highlights", []),
-            "important_facts": session.report_payload.get("important_facts", []),
-            "citation_map": session.report_payload.get("citation_map", {}),
-            "citations": session.report_payload.get("references", []),
-            "follow_up_suggestions": session.follow_up_suggestions,
-            "images": session.image_results,
-            "memory_snippets": session.memory_snippets
-        }
+        return _error_result(session, session.current_question, logs, e, preserve_session=True)
 
 
 def run_research(question: str) -> Dict[str, Any]:
