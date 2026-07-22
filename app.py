@@ -260,13 +260,44 @@ def api_fetch_links():
 def health():
     llm_ok = bool(Config.OPENAI_API_KEY and not str(Config.OPENAI_API_KEY).startswith("your-"))
     tavily_ok = bool(Config.TAVILY_API_KEY and not str(Config.TAVILY_API_KEY).startswith("your-"))
+
+    llm_status = "unknown"
+    llm_error = None
+    llm_provider = "groq" if Config.OPENAI_BASE_URL and "groq" in Config.OPENAI_BASE_URL else "openai"
+
+    if not llm_ok:
+        llm_status = "not_configured"
+    else:
+        # Attempt a lightweight probe to detect invalid keys or quota issues.
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=Config.OPENAI_API_KEY, base_url=Config.OPENAI_BASE_URL)
+            # models.list is a minimal, fast call that verifies authentication and basic access.
+            _ = client.models.list()
+            llm_status = "ok"
+        except Exception as e:
+            msg = str(e).lower()
+            if "insufficient_quota" in msg or "quota exceeded" in msg or "429" in msg or "rate limit" in msg:
+                llm_status = "quota_exceeded"
+                llm_error = "Quota exceeded or rate-limited. Check your billing/usage at https://platform.openai.com/account/usage"
+            elif "invalid_api_key" in msg or "401" in msg or "invalid api key" in msg:
+                llm_status = "invalid_key"
+                llm_error = "The provided OPENAI_API_KEY is invalid or expired. Update your key and restart the app."
+            else:
+                llm_status = "error"
+                llm_error = str(e)
+
+    overall_status = "ok" if (llm_status == "ok" and tavily_ok) else "degraded"
+
     return jsonify({
-        "status": "ok" if (llm_ok and tavily_ok) else "degraded",
+        "status": overall_status,
         "service": "ResearchAI",
         "llm_configured": llm_ok,
         "tavily_configured": tavily_ok,
-        "llm_provider": "groq" if Config.OPENAI_BASE_URL and "groq" in Config.OPENAI_BASE_URL else "openai",
+        "llm_provider": llm_provider,
         "model": Config.OPENAI_MODEL,
+        "llm_status": llm_status,
+        "llm_error": llm_error,
     })
 
 

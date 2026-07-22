@@ -332,8 +332,45 @@ def get_session(session_id: str) -> Any:
 
 def _friendly_error(exc: Exception) -> str:
     """Turn low-level API errors into actionable messages for the UI."""
+    import ast
+
     msg = str(exc)
     lower = msg.lower()
+
+    # If the exception contains a raw error dict string from the OpenAI client,
+    # try to extract the inner message/type for a clearer user-facing message.
+    try:
+        parsed = None
+        if msg.strip().startswith("{"):
+            try:
+                parsed = ast.literal_eval(msg)
+            except Exception:
+                parsed = None
+
+        if parsed and isinstance(parsed, dict):
+            err = parsed.get("error") or {}
+            if isinstance(err, dict):
+                e_msg = err.get("message")
+                e_type = err.get("type")
+                if e_type and "insufficient" in str(e_type).lower():
+                    return (
+                        "OpenAI quota exceeded. Please check your plan and billing at "
+                        "https://platform.openai.com/account/usage and update your subscription."
+                    )
+                if e_msg:
+                    msg = e_msg
+                    lower = msg.lower()
+    except Exception:
+        # Fall back to the original message if parsing fails
+        pass
+
+    # Common, user-actionable mappings
+    if "insufficient_quota" in lower or "quota exceeded" in lower or "429" in msg or "rate limit" in lower:
+        return (
+            "OpenAI quota or rate limit reached. Check your billing/usage on https://platform.openai.com/ "
+            "or upgrade your plan. If you expect this to be transient, try again later."
+        )
+
     if "invalid_api_key" in lower or "invalid api key" in lower or "401" in msg:
         provider = "Groq" if Config.OPENAI_BASE_URL and "groq" in Config.OPENAI_BASE_URL else "LLM"
         return (
@@ -341,10 +378,13 @@ def _friendly_error(exc: Exception) -> str:
             f"Update OPENAI_API_KEY in your Render environment variables "
             f"({provider} key from console.groq.com if using Groq)."
         )
+
     if "tavily" in lower:
         return "Tavily search failed. Check that TAVILY_API_KEY is set correctly in Render."
+
     if "missing configuration" in lower:
         return msg
+
     return f"Research failed: {msg}"
 
 

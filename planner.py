@@ -124,6 +124,20 @@ class LLMPlanner:
             return queries
 
         except Exception as e:
-            # Capture and raise/handle API or network level exceptions.
-            # This provides a clean traceback or error details for downstream systems.
-            raise RuntimeError(f"Failed to generate search queries: {str(e)}") from e
+            # Capture and sanitize API or network level exceptions so we don't
+            # expose raw provider dicts to the UI. Try to extract a concise
+            # error message if the exception contains a dict-like string.
+            import ast
+            short_msg = str(e)
+            try:
+                if short_msg.strip().startswith("{"):
+                    parsed = ast.literal_eval(short_msg)
+                    if isinstance(parsed, dict):
+                        err = parsed.get("error") or {}
+                        if isinstance(err, dict) and err.get("message"):
+                            short_msg = err.get("message")
+            except Exception:
+                # Fall back to the original string if parsing fails
+                pass
+
+            raise RuntimeError(f"Failed to generate search queries: {short_msg}") from e
